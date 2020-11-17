@@ -85,7 +85,7 @@ class ModelV2:
     @PublicAPI
     def forward(self, input_dict: Dict[str, TensorType],
                 state: List[TensorType],
-                seq_lens: TensorType) -> (TensorType, List[TensorType]):
+                seq_lens: TensorType) -> (TensorType, List[TensorType], Dict[str, TensorType]):
         """Call the model with the given input tensors and state.
 
         Any complex observations (dicts, tuples, etc.) will be unpacked by
@@ -108,8 +108,10 @@ class ModelV2:
             seq_lens (Tensor): 1d tensor holding input sequence lengths
 
         Returns:
-            (outputs, state): The model output tensor of size
-                [BATCH, num_outputs], and the new RNN state.
+            (outputs, state, extra_outputs): The model output tensor of size
+                [BATCH, num_outputs].
+                the new RNN state.
+                additional outputs (value function, auxiliary outputs, etc.)
 
         Examples:
             >>> def forward(self, input_dict, state, seq_lens):
@@ -172,10 +174,11 @@ class ModelV2:
         return {}
 
     def __call__(
-            self,
-            input_dict: Dict[str, TensorType],
-            state: List[Any] = None,
-            seq_lens: TensorType = None) -> (TensorType, List[TensorType]):
+        self,
+        input_dict: Dict[str, TensorType],
+        state: List[Any] = None,
+        seq_lens: TensorType = None,
+    ) -> (TensorType, List[TensorType], Dict[str, TensorType]):
         """Call the model with the given input tensors and state.
 
         This is the method used by RLlib to execute the forward pass. It calls
@@ -191,10 +194,11 @@ class ModelV2:
             seq_lens (Tensor): 1d tensor holding input sequence lengths
 
         Returns:
-            (outputs, state): The model output tensor of size
+            (outputs, state, extra_outputs): The model output tensor of size
                 [BATCH, output_spec.size] or a list of tensors corresponding to
                 output_spec.shape_list, and a list of state tensors of
                 [BATCH, state_size_i].
+                dict (optional) extra outputs (value function estimates, auxiliary outputs, etc.)
         """
 
         restored = input_dict.copy()
@@ -207,11 +211,11 @@ class ModelV2:
         with self.context():
             res = self.forward(restored, state or [], seq_lens)
         if ((not isinstance(res, list) and not isinstance(res, tuple))
-                or len(res) != 2):
+                or len(res) != 3):
             raise ValueError(
-                "forward() must return a tuple of (output, state) tensors, "
+                "forward() must return a tuple of (output, state, extra_outputs) tensors, "
                 "got {}".format(res))
-        outputs, state = res
+        outputs, state, extra_outputs = res
 
         try:
             shape = outputs.shape
@@ -226,11 +230,11 @@ class ModelV2:
             raise ValueError("State output is not a list: {}".format(state))
 
         self._last_output = outputs
-        return outputs, state
+        return outputs, state, extra_outputs
 
     @PublicAPI
     def from_batch(self, train_batch: SampleBatch,
-                   is_training: bool = True) -> (TensorType, List[TensorType]):
+                   is_training: bool = True) -> (TensorType, List[TensorType], Dict[str, TensorType]):
         """Convenience function that calls this model with a tensor batch.
 
         All this does is unpack the tensor batch to call this model with the
