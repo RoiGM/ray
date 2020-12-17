@@ -225,10 +225,10 @@ class ValueNetworkMixin:
             # TODO: (sven) Remove once trajectory view API is all-algo default.
             else:
 
-                def value(ob, prev_action, prev_reward, *state):
+                def value(obs, prev_action, prev_reward, *state):
                     model_out, _ = self.model({
                         SampleBatch.CUR_OBS: convert_to_torch_tensor(
-                            np.asarray([ob]), self.device),
+                            np.asarray([obs]), self.device),
                         SampleBatch.PREV_ACTIONS: convert_to_torch_tensor(
                             np.asarray([prev_action]), self.device),
                         SampleBatch.PREV_REWARDS: convert_to_torch_tensor(
@@ -244,7 +244,7 @@ class ValueNetworkMixin:
         # When not doing GAE, we do not require the value function's output.
         else:
 
-            def value(ob, prev_action, prev_reward, *state):
+            def value(*args, **kwargs):
                 return 0.0
 
         self._value = value
